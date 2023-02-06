@@ -1,0 +1,15 @@
+Metadata-Version: 2.1
+Name: RoboCasterTools
+Version: 1.0.0
+Summary: Frequently used tools for robotic reserach and data manipulation
+Home-page: https://github.com/Rooholla-KhorramBakht/RoboCasterTools
+Author: Rooholla Khorrambakht
+Author-email: rk4342@nyu.edu
+License: MIT
+Classifier: License :: OSI Approved :: MIT License
+Description-Content-Type: text/markdown
+License-File: LICENSE
+
+# Robocaster Toolsets 
+
+This repository maintains a set of frequently used tools in my robotics PhD journey.

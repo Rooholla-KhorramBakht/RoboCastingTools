@@ -47,3 +47,4 @@ def bag2Images(bag_file_path, output_dir, image_topic):
     bag.close()
     df = pd.DataFrame(data = df_data)
     df.to_csv(os.path.join(output_dir,'stamps.csv'), index=False)
+
