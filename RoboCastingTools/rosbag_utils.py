@@ -10,6 +10,41 @@ import pandas as pd
 import numpy as np
 from tqdm import tqdm
 
+import rosbag
+from tf2_msgs.msg import TFMessage
+from collections import defaultdict
+
+def extract_tf_data(bagfile):
+    """
+    Extracts transformation (TF) data from a given ROS bag file.
+    
+    Parameters:
+    bagfile (str): The path to the bag file from which to extract TF data.
+
+    Returns:
+    dict: A dictionary where the keys are the TF's frame IDs (child frame ID) and the values are lists of tuples. 
+    Each tuple represents the time stamp of the frame, pose and the corresponding parent ID of the tf message.
+
+    Example:
+    {'tag_id1': [(timestamp2, (x, y, z, rotation), parent_id), ...], 
+    'tag_id2': [(timestamp2, (x, y, z, rotation), parent_id), ...], 
+    ...}
+    """
+    bag = rosbag.Bag(bagfile)
+    tf_data = defaultdict(list)
+    for topic, msg, t in bag.read_messages(topics=['/tf', '/tf_static']):
+        for transform in msg.transforms:
+            # You can also use child_frame_id depending on your needs
+            tag_id = transform.child_frame_id
+            parent_id = transform.header.frame_id
+            pose = transform.transform
+            timestamp = t.to_sec()  # Convert to seconds
+
+            tf_data[tag_id].append((timestamp, parent_id, pose))
+
+    bag.close()
+    return tf_data
+
 
 def bag2Images(bag_file_path, output_dir, image_topic):
 
