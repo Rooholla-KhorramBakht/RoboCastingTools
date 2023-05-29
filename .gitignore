@@ -133,3 +133,4 @@ dmypy.json
 
 # Build Files
 build
+notebooks/results
