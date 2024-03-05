@@ -85,3 +85,52 @@ def bag2Images(bag_file_path, output_dir, image_topic):
     bag.close()
     df = pd.DataFrame(data=df_data)
     df.to_csv(os.path.join(output_dir, "stamps.csv"), index=False)
+
+
+def bag2Video(bag_file_path, output_dir, image_topic, fps=30, video_name='output_video'):
+    """
+    bag2Video extracts the RGB images published in a ROS bagfile and compiles them into an MP4 video.
+    It also stores the corresponding timestamps into a csv file.
+
+    :param bag_file_path: path to the rosbag file
+    :param output_dir:    the output directory where the video and stamps should be stored
+    :param image_topic:   the name of the image topic published in the rosbag file
+    :param fps:           frames per second for the output video
+    :param video_name:    name of the output video file without extension
+    :returns: None
+    """
+
+    image_stamps = []  # Store the image timestamps
+    video_initialized = False
+
+    bag = rosbag.Bag(bag_file_path, "r")
+    bridge = CvBridge()
+    count = 0
+    video_writer = None
+
+    for topic, msg, t in tqdm(bag.read_messages(topics=[image_topic])):
+        cv_img = bridge.imgmsg_to_cv2(msg, desired_encoding="passthrough")
+        if not video_initialized:
+            h, w = cv_img.shape[:2]
+            video_path = os.path.join(output_dir, f"{video_name}.mp4")
+            fourcc = cv2.VideoWriter_fourcc(*'mp4v')  # Define the codec and create VideoWriter object
+            video_writer = cv2.VideoWriter(video_path, fourcc, fps, (w, h))
+            video_initialized = True
+        
+        img = cv2.cvtColor(cv_img, cv2.COLOR_BGR2RGB)
+        video_writer.write(img)  # Write frame to video
+
+        image_stamps.append([t.to_nsec(), count])
+        count += 1
+
+    if video_writer:
+        video_writer.release()  # Release the video writer
+
+    image_stamps = np.array(image_stamps)
+    df_data = {"timestamp(ns)": image_stamps[:, 0], "image_idx": image_stamps[:, 1]}
+
+    bag.close()
+
+    # Save timestamps to CSV
+    df = pd.DataFrame(data=df_data)
+    df.to_csv(os.path.join(output_dir, "timestamps.csv"), index=False)
