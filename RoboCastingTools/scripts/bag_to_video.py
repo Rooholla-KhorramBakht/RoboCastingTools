@@ -13,7 +13,7 @@ def main():
     parser.add_argument("output_dir", help="Output directory.")
     parser.add_argument("image_topic", help="Image topic.")
     parser.add_argument("fps", help="video FPS.")
-
+    
 
     args = parser.parse_args()
     bag2Video(args.bag_file, args.out_dir, args.image_topic, args.fps, args.output_dir)

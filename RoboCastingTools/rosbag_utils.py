@@ -14,7 +14,7 @@ import rosbag
 from tf2_msgs.msg import TFMessage
 from collections import defaultdict
 from scipy.spatial.transform import Rotation
-
+import shutil
 
 def extract_tf_data(bagfile):
     """
@@ -61,30 +61,30 @@ def bag2Images(bag_file_path, output_dir, image_topic):
     :param image_topic:   the name of the image topic published in the rosbag file.
     :returns: None
     """
+    if os.path.exists(os.path.join(output_dir)):
+        shutil.rmtree(os.path.join(output_dir))
+        os.mkdir(os.path.join(output_dir))
+        os.mkdir(os.path.join(output_dir, 'data'))
+    else:
+        os.mkdir(os.path.join(output_dir))
+        os.mkdir(os.path.join(output_dir, 'data'))
 
-    image_stamps = []  # Store the image timestamps
-
+    data = []  # Store the image timestamps
     bag = rosbag.Bag(bag_file_path, "r")
     bridge = CvBridge()
-    count = 0
     for topic, msg, t in tqdm(bag.read_messages(topics=[image_topic])):
         cv_img = bridge.imgmsg_to_cv2(msg, desired_encoding="passthrough")
-        # img_rgb = Image.fromarray(cv_img)
-        # img_rgb.save(os.path.join(output_dir, f"{count}.png"))
+        stamp = msg.header.stamp.to_nsec()
         img = cv2.cvtColor(cv_img, cv2.COLOR_BGR2RGB)
-        cv2.imwrite(os.path.join(output_dir, f"{count}.bmp"), img)
+        cv2.imwrite(os.path.join(output_dir,'data', f"{stamp}.png"), img)
         cv2.imshow("preview", img)
         cv2.waitKey(1)
-
-        image_stamps.append([t.to_nsec(), count])
-        count += 1
-
-    image_stamps = np.array(image_stamps)
-    df_data = {"timestamp(ns)": image_stamps[:, 0], "image_idx": image_stamps[:, 1]}
+        data.append([stamp, f"{stamp}.png"])
 
     bag.close()
-    df = pd.DataFrame(data=df_data)
-    df.to_csv(os.path.join(output_dir, "stamps.csv"), index=False)
+    df = pd.DataFrame(data=data, columns=['#timestamp [ns]', 'filename'])
+    df.to_csv(os.path.join(output_dir,"data.csv"), index=False)
+    cv2.destroyAllWindows()
 
 
 def bag2IMUs(bag_file_path, output_dir, imu_topic, output_file_name='imu'):
@@ -131,6 +131,7 @@ def bag2IMUs(bag_file_path, output_dir, imu_topic, output_file_name='imu'):
     stamps = np.array(stamps).reshape(-1,1)
     data = np.hstack([stamps, gyros, accels])
     df = pd.DataFrame(data=data, columns= column_names)
+    df.to_csv(os.path.join(output_dir, 'data.csv'), index = False)
     return df
 
 def bag2Poses(bag_file_path, output_dir, pose_topic, output_file_name='imu'):
@@ -180,5 +181,6 @@ def bag2Poses(bag_file_path, output_dir, pose_topic, output_file_name='imu'):
     stamps = np.array(stamps).reshape(-1,1)
     data = np.hstack([stamps, ts, qs])
     df = pd.DataFrame(data=data, columns= column_names)
+    df.to_csv(os.path.join(output_dir, 'data.csv'), index = False)
     return df
 
