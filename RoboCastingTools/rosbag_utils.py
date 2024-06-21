@@ -87,50 +87,98 @@ def bag2Images(bag_file_path, output_dir, image_topic):
     df.to_csv(os.path.join(output_dir, "stamps.csv"), index=False)
 
 
-def bag2Video(bag_file_path, output_dir, image_topic, fps=30, video_name='output_video'):
+def bag2IMUs(bag_file_path, output_dir, imu_topic, output_file_name='imu'):
     """
-    bag2Video extracts the RGB images published in a ROS bagfile and compiles them into an MP4 video.
-    It also stores the corresponding timestamps into a csv file.
+    bag2Imus extracts the RGB images published in a ROS bagfile and returns a pandas dataframe.
 
     :param bag_file_path: path to the rosbag file
     :param output_dir:    the output directory where the video and stamps should be stored
-    :param image_topic:   the name of the image topic published in the rosbag file
-    :param fps:           frames per second for the output video
-    :param video_name:    name of the output video file without extension
+    :param imu_topic:   the name of the IMU topic published in the rosbag file
+    :param output_file_name:    name of the output CSV file without extension
     :returns: None
     """
 
-    image_stamps = []  # Store the image timestamps
-    video_initialized = False
+    imu_stamps = []  # Store the image timestamps
 
     bag = rosbag.Bag(bag_file_path, "r")
-    bridge = CvBridge()
-    count = 0
-    video_writer = None
+    column_names = ["#timestamp [ns]", 
+                    "w_RS_S_x [rad s^-1]", 
+                    "w_RS_S_y [rad s^-1]",
+                    "w_RS_S_z [rad s^-1]",
+                    "a_RS_S_x [m s^-2]",
+                    "a_RS_S_y [m s^-2]",
+                    "a_RS_S_z [m s^-2]"]
+    
+    accels = []
+    gyros = []
+    stamps = []
+    for topic, msg, t in tqdm(bag.read_messages(topics=[imu_topic])):
+        stamp = msg.header.stamp.to_nsec()
+        ax = msg.linear_acceleration.x 
+        ay = msg.linear_acceleration.y 
+        az = msg.linear_acceleration.z 
+        wx = msg.angular_velocity.x 
+        wy = msg.angular_velocity.y 
+        wz = msg.angular_velocity.z 
+        accel = [ax, ay, az]
+        gyro = [wx, wy, wz]
+        accels.append(accel)
+        gyros.append(gyro)
+        stamps.append(stamp)
+    assert len(stamps) > 0, 'There are no IMU topics with the given name in the selected bag file or the number of published topics is zero.'
+    accels = np.array(accels)
+    gyros = np.array(gyros)
+    stamps = np.array(stamps).reshape(-1,1)
+    data = np.hstack([stamps, gyros, accels])
+    df = pd.DataFrame(data=data, columns= column_names)
+    return df
 
-    for topic, msg, t in tqdm(bag.read_messages(topics=[image_topic])):
-        cv_img = bridge.imgmsg_to_cv2(msg, desired_encoding="passthrough")
-        if not video_initialized:
-            h, w = cv_img.shape[:2]
-            video_path = os.path.join(output_dir, f"{video_name}.mp4")
-            fourcc = cv2.VideoWriter_fourcc(*'mp4v')  # Define the codec and create VideoWriter object
-            video_writer = cv2.VideoWriter(video_path, fourcc, fps, (w, h))
-            video_initialized = True
-        
-        img = cv2.cvtColor(cv_img, cv2.COLOR_BGR2RGB)
-        video_writer.write(img)  # Write frame to video
+def bag2Poses(bag_file_path, output_dir, pose_topic, output_file_name='imu'):
+    """
+    bag2Imus extracts the RGB images published in a ROS bagfile and returns a pandas dataframe.
 
-        image_stamps.append([t.to_nsec(), count])
-        count += 1
+    :param bag_file_path: path to the rosbag file
+    :param output_dir:    the output directory where the video and stamps should be stored
+    :param imu_topic:   the name of the IMU topic published in the rosbag file
+    :param output_file_name:    name of the output CSV file without extension
+    :returns: None
+    """
 
-    if video_writer:
-        video_writer.release()  # Release the video writer
+    imu_stamps = []  # Store the image timestamps
 
-    image_stamps = np.array(image_stamps)
-    df_data = {"timestamp(ns)": image_stamps[:, 0], "image_idx": image_stamps[:, 1]}
+    bag = rosbag.Bag(bag_file_path, "r")
+    column_names = ["#timestamp [ns]", 
+                    "p_RS_R_x [m]", 
+                    "p_RS_R_y [m]",
+                    "p_RS_R_z [m]",
+                    "q_RS_w []",
+                    "q_RS_x []",
+                    "q_RS_y []",
+                    "q_RS_z []",
+                    ]
+    ts = []
+    qs = []
+    stamps = []
+    for topic, msg, t in tqdm(bag.read_messages(topics=[pose_topic])):
+        stamp = msg.header.stamp.to_nsec()
+        px = msg.pose.position.x 
+        py = msg.pose.position.y 
+        pz = msg.pose.position.z 
+        qx = msg.pose.orientation.x 
+        qy = msg.pose.orientation.y 
+        qz = msg.pose.orientation.z 
+        qw = msg.pose.orientation.w 
+        t = [px, py, pz]
+        q = [qw, qx, qy, qz]
+        ts.append(t)
+        qs.append(q)
+        stamps.append(stamp)
 
-    bag.close()
+    assert len(stamps) > 0, 'There are no pose topics with the given name in the selected bag file or the number of published topics is zero.'
+    qs = np.array(qs)
+    ts = np.array(ts)
+    stamps = np.array(stamps).reshape(-1,1)
+    data = np.hstack([stamps, ts, qs])
+    df = pd.DataFrame(data=data, columns= column_names)
+    return df
 
-    # Save timestamps to CSV
-    df = pd.DataFrame(data=df_data)
-    df.to_csv(os.path.join(output_dir, "timestamps.csv"), index=False)
