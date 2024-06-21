@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 import pickle
 import argparse
-from RoboCastingTools.rosbag_utils import extract_tf_data
+from RoboTools.rosbag_utils import extract_tf_data
 
 def save_to_pickle(data, file):
     with open(file, 'wb') as f:
