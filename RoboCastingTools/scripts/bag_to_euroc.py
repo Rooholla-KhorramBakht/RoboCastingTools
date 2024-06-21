@@ -16,6 +16,7 @@ def main():
     parser.add_argument("--vicon_topic", help="Vicon topic.", default=None)
     parser.add_argument("--img0_topic", help="Optional image topic for img0.", default=None)
     parser.add_argument("--img1_topic", help="Optional image topic for img1.", default=None)
+    parser.add_argument("--color0_topic", help="Optional image topic for the color camera.", default=None)
     parser.add_argument("--depth_topic", help="Optional depth image topic.", default=None)
     parser.add_argument("--jointstate_topic", help="Optional jointstates topic.", default=None)
     parser.add_argument("--feet_contact_topic", help="Optional foot contact topic.", default=None)
@@ -29,6 +30,8 @@ def main():
             os.mkdir(os.path.join(args.output_dir, 'imu0'))
         if args.img0_topic is not None:
             os.mkdir(os.path.join(args.output_dir, 'imu0'))
+        if args.color0_topic is not None:
+            os.mkdir(os.path.join(args.output_dir, 'color0'))
         if args.img1_topic is not None:
             os.mkdir(os.path.join(args.output_dir, 'imu1'))
         if args.vicon_topic is not None:
@@ -45,6 +48,8 @@ def main():
             os.mkdir(os.path.join(args.output_dir, 'imu0'))
         if args.img0_topic is not None:
             os.mkdir(os.path.join(args.output_dir, 'imu0'))
+        if args.color0_topic is not None:
+            os.mkdir(os.path.join(args.output_dir, 'color0'))
         if args.img1_topic is not None:
             os.mkdir(os.path.join(args.output_dir, 'imu1'))
         if args.vicon_topic is not None:
@@ -62,12 +67,18 @@ def main():
     if args.img1_topic is not None:
         print('Extracting the img1 data')
         bag2Images(args.bag_file, os.path.join(args.output_dir, 'cam1'), args.img1_topic)
+    if args.color0_topic is not None:
+        print('Extracting the color0 data')
+        bag2Images(args.bag_file, os.path.join(args.output_dir, 'color0'), args.color0_topic)
     if args.imu_topic is not None:
         print('Extracting the IMU data')
         bag2IMUs(args.bag_file, os.path.join(args.output_dir, 'imu0'), args.imu_topic)
     if args.vicon_topic is not None:
         print('Extracting the Vicon data')
         bag2Poses(args.bag_file, os.path.join(args.output_dir, 'vicon0'), args.vicon_topic)
+    if args.depth_topic is not None:
+        print('Extracting the depth data')
+        bag2DepthImages(args.bag_file, os.path.join(args.output_dir, 'depth0'), args.depth_topic)
     return
 
 if __name__ == "__main__":

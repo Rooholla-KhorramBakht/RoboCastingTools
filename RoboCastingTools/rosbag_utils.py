@@ -86,10 +86,38 @@ def bag2Images(bag_file_path, output_dir, image_topic):
     df.to_csv(os.path.join(output_dir,"data.csv"), index=False)
     cv2.destroyAllWindows()
 
+def bag2DepthImages(bag_file_path, output_dir, depth_image_topic):
+    """
+    bag2DepthImages extracts the depth images published in a ROS bagfile and
+    stores them as 16-bit PNG files alongside the corresponding timestamps into a csv file.
+
+    :param bag_file_path: path to the rosbag file
+    :param output_dir:    the output directory where the extracted images and stamps should be stored
+    :param depth_image_topic:   the name of the depth image topic published in the rosbag file.
+    :returns: None
+    """
+    if os.path.exists(os.path.join(output_dir)):
+        shutil.rmtree(os.path.join(output_dir))
+    os.mkdir(output_dir)
+    os.mkdir(os.path.join(output_dir, 'data'))
+
+    data = []  # Store the image timestamps
+    bag = rosbag.Bag(bag_file_path, "r")
+    bridge = CvBridge()
+    for topic, msg, t in tqdm(bag.read_messages(topics=[depth_image_topic])):
+        cv_img = bridge.imgmsg_to_cv2(msg, desired_encoding="passthrough")
+        stamp = msg.header.stamp.to_nsec()
+        cv2.imwrite(os.path.join(output_dir, 'data', f"{stamp}.png"), cv_img, [cv2.IMWRITE_PNG_COMPRESSION, 0])
+        data.append([stamp, f"{stamp}.png"])
+
+    bag.close()
+    df = pd.DataFrame(data=data, columns=['#timestamp [ns]', 'filename'])
+    df.to_csv(os.path.join(output_dir, "data.csv"), index=False)
+
 
 def bag2IMUs(bag_file_path, output_dir, imu_topic, output_file_name='imu'):
     """
-    bag2Imus extracts the RGB images published in a ROS bagfile and returns a pandas dataframe.
+    bag2Imus extracts the IMU data published in a ROS bagfile and returns a pandas dataframe.
 
     :param bag_file_path: path to the rosbag file
     :param output_dir:    the output directory where the video and stamps should be stored
@@ -136,7 +164,7 @@ def bag2IMUs(bag_file_path, output_dir, imu_topic, output_file_name='imu'):
 
 def bag2Poses(bag_file_path, output_dir, pose_topic, output_file_name='imu'):
     """
-    bag2Imus extracts the RGB images published in a ROS bagfile and returns a pandas dataframe.
+    bag2Poses extracts the stamp poses published in a ROS bagfile and returns a pandas dataframe.
 
     :param bag_file_path: path to the rosbag file
     :param output_dir:    the output directory where the video and stamps should be stored
