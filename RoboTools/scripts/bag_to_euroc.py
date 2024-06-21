@@ -79,6 +79,12 @@ def main():
     if args.depth_topic is not None:
         print('Extracting the depth data')
         bag2DepthImages(args.bag_file, os.path.join(args.output_dir, 'depth0'), args.depth_topic)
+    if args.jointstate_topic is not None:
+        print('Extracting the jointstates data')
+        bag2JointStates(args.bag_file, os.path.join(args.output_dir, 'joints0'), args.jointstate_topic)
+    if args.feet_contact_topic is not None:
+        print('Extracting the feet contact data')
+        bag2FeetContacts(args.bag_file, os.path.join(args.output_dir, 'feet_contact0'), args.feet_contact_topic)
     return
 
 if __name__ == "__main__":

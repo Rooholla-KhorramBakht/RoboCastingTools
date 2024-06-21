@@ -115,18 +115,15 @@ def bag2DepthImages(bag_file_path, output_dir, depth_image_topic):
     df.to_csv(os.path.join(output_dir, "data.csv"), index=False)
 
 
-def bag2IMUs(bag_file_path, output_dir, imu_topic, output_file_name='imu'):
+def bag2IMUs(bag_file_path, output_dir, imu_topic):
     """
     bag2Imus extracts the IMU data published in a ROS bagfile and returns a pandas dataframe.
 
     :param bag_file_path: path to the rosbag file
     :param output_dir:    the output directory where the video and stamps should be stored
     :param imu_topic:   the name of the IMU topic published in the rosbag file
-    :param output_file_name:    name of the output CSV file without extension
     :returns: None
     """
-
-    imu_stamps = []  # Store the image timestamps
 
     bag = rosbag.Bag(bag_file_path, "r")
     column_names = ["#timestamp [ns]", 
@@ -162,18 +159,15 @@ def bag2IMUs(bag_file_path, output_dir, imu_topic, output_file_name='imu'):
     df.to_csv(os.path.join(output_dir, 'data.csv'), index = False)
     return df
 
-def bag2Poses(bag_file_path, output_dir, pose_topic, output_file_name='imu'):
+def bag2Poses(bag_file_path, output_dir, pose_topic):
     """
     bag2Poses extracts the stamp poses published in a ROS bagfile and returns a pandas dataframe.
 
     :param bag_file_path: path to the rosbag file
     :param output_dir:    the output directory where the video and stamps should be stored
     :param imu_topic:   the name of the IMU topic published in the rosbag file
-    :param output_file_name:    name of the output CSV file without extension
     :returns: None
     """
-
-    imu_stamps = []  # Store the image timestamps
 
     bag = rosbag.Bag(bag_file_path, "r")
     column_names = ["#timestamp [ns]", 
@@ -208,6 +202,110 @@ def bag2Poses(bag_file_path, output_dir, pose_topic, output_file_name='imu'):
     ts = np.array(ts)
     stamps = np.array(stamps).reshape(-1,1)
     data = np.hstack([stamps, ts, qs])
+    df = pd.DataFrame(data=data, columns= column_names)
+    df.to_csv(os.path.join(output_dir, 'data.csv'), index = False)
+    return df
+
+def bag2JointStates(bag_file_path, output_dir, joint_state_topic):
+    """
+    bag2JointStates extracts the joint states published in a ROS bagfile and returns a pandas dataframe.
+
+    :param bag_file_path: path to the rosbag file
+    :param output_dir:    the output directory where the video and stamps should be stored
+    :param joint_state_topic:   the name of the joint state topic published in the rosbag file
+    :returns: None
+    """
+
+    bag = rosbag.Bag(bag_file_path, "r")
+    column_names = ["#timestamp [ns]", 
+                    "FR_HIP_q [rad]",
+                    "FR_THIGH_q [rad]",
+                    "FR_KNEE_q [rad]",
+                    "FL_HIP_q [rad]",
+                    "FL_THIGH_q [rad]",
+                    "FL_KNEE_q [rad]",
+                    "RR_HIP_q [rad]",
+                    "RR_THIGH_q [rad]",
+                    "RR_KNEE_q [rad]",
+                    "RL_HIP_q [rad]",
+                    "RL_THIGH_q [rad]",
+                    "RL_KNEE_q [rad]",
+                    "FR_HIP_qd [rad s^-1]",
+                    "FR_THIGH_qd [rad s^-1]",
+                    "FR_KNEE_qd [rad s^-1]",
+                    "FL_HIP_qd [rad s^-1]",
+                    "FL_THIGH_qd [rad s^-1]",
+                    "FL_KNEE_qd [rad s^-1]",
+                    "RR_HIP_qd [rad s^-1]",
+                    "RR_THIGH_qd [rad s^-1]",
+                    "RR_KNEE_qd [rad s^-1]",
+                    "RL_HIP_qd [rad s^-1]",
+                    "RL_THIGH_qd [rad s^-1]",
+                    "RL_KNEE_qd [rad s^-1]",
+                    "FR_HIP_tau [Nm]",
+                    "FR_THIGH_tau [Nm]",
+                    "FR_KNEE_tau [Nm]",
+                    "FL_HIP_tau [Nm]",
+                    "FL_THIGH_tau [Nm]",
+                    "FL_KNEE_tau [Nm]",
+                    "RR_HIP_tau [Nm]",
+                    "RR_THIGH_tau [Nm]",
+                    "RR_KNEE_tau [Nm]",
+                    "RL_HIP_tau [Nm]",
+                    "RL_THIGH_tau [Nm]",
+                    "RL_KNEE_tau [Nm]",
+                    ]
+    q = []
+    qd = []
+    tau = []
+    stamps = []
+    for topic, msg, t in tqdm(bag.read_messages(topics=[joint_state_topic])):
+        stamp = msg.header.stamp.to_nsec()
+        q = msg.position
+        qd = msg.velocity
+        tau = msg.effort
+        stamps.append(stamp)
+    assert len(stamps) > 0, 'There are no joint state topics with the given name in the selected bag file or the number of published topics is zero.'
+    q = np.array(q)
+    qd = np.array(qd)
+    tau = np.array(tau)
+    stamps = np.array(stamps).reshape(-1,1)
+    data = np.hstack([stamps, q, qd, tau])
+    df = pd.DataFrame(data=data, columns= column_names)
+    df.to_csv(os.path.join(output_dir, 'data.csv'), index = False)
+    return df
+
+def bag2FootContacts(bag_file_path, output_dir, foot_contact_topic):
+    """
+    bag2JointStates extracts the foot contacts published as joint state messages in a ROS bagfile and returns a pandas dataframe.
+
+    :param bag_file_path: path to the rosbag file
+    :param output_dir:    the output directory where the video and stamps should be stored
+    :param foot_contact_topic:   the name of the joint state topic published in the rosbag file
+    :returns: None
+    """
+    
+    bag = rosbag.Bag(bag_file_path, "r")
+    column_names = ["#timestamp [ns]", 
+                    "FR_Contact [N]",
+                    "FL_Contact [N]",
+                    "RR_Contact [N]",
+                    "RL_Contact [N]",
+                    ]
+    contacts = []
+    stamps = [] 
+    for topic, msg, t in tqdm(bag.read_messages(topics=[foot_contact_topic])):
+        stamp = msg.header.stamp.to_nsec()
+        fr = msg.states[0].effort
+        fl = msg.states[1].effort
+        rr = msg.states[2].effort
+        rl = msg.states[3].effort
+        contacts.append([fr, fl, rr, rl])
+        stamps.append(stamp)
+    assert len(stamps) > 0, 'There are no foot contact topics with the given name in the selected bag file or the number of published topics is zero.'
+    contacts = np.array(contacts)
+    stamps = np.array(stamps).reshape(-1,1)
+    data = np.hstack([stamps, contacts])
     df = pd.DataFrame(data=data, columns= column_names)
     df.to_csv(os.path.join(output_dir, 'data.csv'), index = False)
     return df
