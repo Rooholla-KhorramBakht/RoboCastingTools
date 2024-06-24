@@ -15,6 +15,8 @@ from tf2_msgs.msg import TFMessage
 from collections import defaultdict
 from scipy.spatial.transform import Rotation
 import shutil
+import sensor_msgs.point_cloud2 as pc2
+
 
 def extract_tf_data(bagfile):
     """
@@ -51,7 +53,7 @@ def extract_tf_data(bagfile):
     return tf_data
 
 
-def bag2Images(bag_file_path, output_dir, image_topic):
+def bag2Images(bag_file_path, output_dir, image_topic, color_convert = True):
     """
     bag2Images extracts the RGB images published in a ROS bagfile and
     stores them alongside the corresponding timestamps into a csv file.
@@ -59,6 +61,7 @@ def bag2Images(bag_file_path, output_dir, image_topic):
     :param bag_file_path: path to the rosbag file
     :param output_dir:    the output directory where the extracted images and stamps should be stored
     :param image_topic:   the name of the image topic published in the rosbag file.
+    :param color_convert: boolean flag to convert the images from BGR to RGB format.
     :returns: None
     """
     if os.path.exists(os.path.join(output_dir)):
@@ -75,7 +78,10 @@ def bag2Images(bag_file_path, output_dir, image_topic):
     for topic, msg, t in tqdm(bag.read_messages(topics=[image_topic])):
         cv_img = bridge.imgmsg_to_cv2(msg, desired_encoding="passthrough")
         stamp = msg.header.stamp.to_nsec()
-        img = cv2.cvtColor(cv_img, cv2.COLOR_BGR2RGB)
+        if color_convert:
+            img = cv2.cvtColor(cv_img, cv2.COLOR_BGR2RGB)
+        else:
+            img = cv_img
         cv2.imwrite(os.path.join(output_dir,'data', f"{stamp}.png"), img)
         cv2.imshow("preview", img)
         cv2.waitKey(1)
@@ -261,9 +267,9 @@ def bag2JointStates(bag_file_path, output_dir, joint_state_topic):
     stamps = []
     for topic, msg, t in tqdm(bag.read_messages(topics=[joint_state_topic])):
         stamp = msg.header.stamp.to_nsec()
-        q = msg.position
-        qd = msg.velocity
-        tau = msg.effort
+        q.append(msg.position)
+        qd.append(msg.velocity)
+        tau.append(msg.effort)
         stamps.append(stamp)
     assert len(stamps) > 0, 'There are no joint state topics with the given name in the selected bag file or the number of published topics is zero.'
     q = np.array(q)
@@ -296,10 +302,10 @@ def bag2FootContacts(bag_file_path, output_dir, foot_contact_topic):
     stamps = [] 
     for topic, msg, t in tqdm(bag.read_messages(topics=[foot_contact_topic])):
         stamp = msg.header.stamp.to_nsec()
-        fr = msg.states[0].effort
-        fl = msg.states[1].effort
-        rr = msg.states[2].effort
-        rl = msg.states[3].effort
+        fr = msg.effort[0]
+        fl = msg.effort[1]
+        rr = msg.effort[2]
+        rl = msg.effort[3]
         contacts.append([fr, fl, rr, rl])
         stamps.append(stamp)
     assert len(stamps) > 0, 'There are no foot contact topics with the given name in the selected bag file or the number of published topics is zero.'
@@ -310,3 +316,85 @@ def bag2FootContacts(bag_file_path, output_dir, foot_contact_topic):
     df.to_csv(os.path.join(output_dir, 'data.csv'), index = False)
     return df
 
+def bag2Odoms(bag_file_path, output_dir, pose_topic):
+    """
+    bag2Poses extracts the stamp poses with covariance published in a ROS bagfile as odometry messages and returns a pandas dataframe.
+
+    :param bag_file_path: path to the rosbag file
+    :param output_dir:    the output directory where the video and stamps should be stored
+    :param imu_topic:   the name of the IMU topic published in the rosbag file
+    :returns: None
+    """
+
+    bag = rosbag.Bag(bag_file_path, "r")
+    column_names = ["#timestamp [ns]", 
+                    "p_RS_R_x [m]", 
+                    "p_RS_R_y [m]",
+                    "p_RS_R_z [m]",
+                    "q_RS_w []",
+                    "q_RS_x []",
+                    "q_RS_y []",
+                    "q_RS_z []",
+                    ]
+    ts = []
+    qs = []
+    stamps = []
+    for topic, msg, t in tqdm(bag.read_messages(topics=[pose_topic])):
+        stamp = msg.header.stamp.to_nsec()
+        px = msg.pose.pose.position.x 
+        py = msg.pose.pose.position.y 
+        pz = msg.pose.pose.position.z 
+        qx = msg.pose.pose.orientation.x 
+        qy = msg.pose.pose.orientation.y 
+        qz = msg.pose.pose.orientation.z 
+        qw = msg.pose.pose.orientation.w 
+        t = [px, py, pz]
+        q = [qw, qx, qy, qz]
+        ts.append(t)
+        qs.append(q)
+        stamps.append(stamp)
+
+    assert len(stamps) > 0, 'There are no pose topics with the given name in the selected bag file or the number of published topics is zero.'
+    qs = np.array(qs)
+    ts = np.array(ts)
+    stamps = np.array(stamps).reshape(-1,1)
+    data = np.hstack([stamps, ts, qs])
+    df = pd.DataFrame(data=data, columns= column_names)
+    df.to_csv(os.path.join(output_dir, 'data.csv'), index = False)
+    return df
+
+def bag2Pointclouds(bag_file_path, output_dir, depth_image_topic):
+    """
+    bag2Pointclouds extracts the pointcloud data published in a ROS bagfile and
+    stores them as npy arrays alongside the corresponding timestamps into a csv file.
+
+    :param bag_file_path: path to the rosbag file
+    :param output_dir:    the output directory where the extracted images and stamps should be stored
+    :param depth_image_topic:   the name of the depth image topic published in the rosbag file.
+    :returns: None
+    """
+    if os.path.exists(os.path.join(output_dir)):
+        shutil.rmtree(os.path.join(output_dir))
+    os.mkdir(output_dir)
+    os.mkdir(os.path.join(output_dir, 'data'))
+
+    data = []  # Store the image timestamps
+    bag = rosbag.Bag(bag_file_path, "r")
+    bridge = CvBridge()
+    stamps = []
+    for topic, msg, t in tqdm(bag.read_messages(topics=[depth_image_topic])):
+        stamp = msg.header.stamp.to_nsec()
+        stamps.append(stamp)
+        pcd = np.array(list(pc2.read_points(msg, field_names=['time','x', 'y', 'z','intensity'], skip_nans=True)))
+        with open(os.path.join(output_dir, 'data', f"{stamp}.npy"), 'wb') as f:
+            np.save(f, pcd)
+        data.append([stamp, f"{stamp}.npy"])
+
+    bag.close()
+    df = pd.DataFrame(data=data, columns=['#timestamp [ns]', 'filename'])
+    df.to_csv(os.path.join(output_dir, "data.csv"), index=False)
+
+    assert len(stamps) > 0, 'There are no pose topics with the given name in the selected bag file or the number of published topics is zero.'
+    bag.close()
+    df = pd.DataFrame(data=data, columns=['#timestamp [ns]', 'filename'])
+    df.to_csv(os.path.join(output_dir, "data.csv"), index=False)
